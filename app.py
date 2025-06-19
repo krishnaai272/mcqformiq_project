@@ -4,9 +4,12 @@ from form_rules import validate_form
 from summarizer import summarize_form
 from pdf_report import generate_pdf
 from utils import send_email, generate_qr, save_to_csv
-import os  # Import the os module
+import os
 from dotenv import load_dotenv
 load_dotenv()
+
+# Define the path for the CSV file. This makes it easy to reference.
+CSV_FILE_PATH = "patient_data.csv"
 
 # -------------------------------
 # Session State Initialization
@@ -32,7 +35,7 @@ def login_section():
         # Use a more secure password in a real application, e.g., from st.secrets
         if pwd == correct_password:
             st.session_state.authenticated = True
-            st.rerun()  # Use st.rerun() instead of the deprecated version
+            st.rerun()
         else:
             st.error("❌ Incorrect password")
             st.stop()
@@ -43,6 +46,23 @@ def login_section():
 # -------------------------------
 def form_section():
     st.title("🧠 AutoFormIQ - Smart Intake Form")
+
+    # --- NEW: Sidebar for Admin actions like CSV download ---
+    st.sidebar.header("📋 Data Export")
+
+    # Check if the CSV file exists before showing the download button
+    if os.path.exists(CSV_FILE_PATH):
+        with open(CSV_FILE_PATH, "rb") as file:
+            st.sidebar.download_button(
+                label="⬇️ Download All Entries (CSV)",
+                data=file,
+                file_name="all_patient_data.csv", # The name for the downloaded file
+                mime="text/csv"
+            )
+    else:
+        st.sidebar.info("Submit at least one form to enable CSV download.")
+    # --- End of new section ---
+
 
     # --- STATE 1: FORM IS NOT SUBMITTED, SHOW THE FORM ---
     if not st.session_state.submitted:
@@ -55,7 +75,6 @@ def form_section():
             temperature = st.number_input("🌡️ Temperature (°F)", min_value=90.0, max_value=110.0, format="%.1f")
             email = st.text_input("📧 Clinic Email to Receive PDF")
             
-            # This is the button inside the form
             submit_button = st.form_submit_button("Submit Form")
 
         if submit_button:
@@ -72,34 +91,30 @@ def form_section():
             if errors:
                 st.error("\n".join(errors))
             else:
-                # On successful validation, process data and change state
                 with st.spinner("Processing your submission..."):
                     summary = summarize_form(form_data)
                     pdf_path = generate_pdf(form_data, summary)
-                    save_to_csv(form_data)
+                    # Pass the defined CSV file path to the save function
+                    save_to_csv(form_data, filename=CSV_FILE_PATH)
 
-                    # Store results in session state to use after the rerun
                     st.session_state.summary = summary
                     st.session_state.pdf_path = pdf_path
-                    st.session_state.clinic_email = email # Store email for sending later
+                    st.session_state.clinic_email = email
 
-                    # Set the submitted flag to True
                     st.session_state.submitted = True
                 
-                # Rerun the script to move to the 'submitted' state view
                 st.rerun()
 
     # --- STATE 2: FORM IS SUBMITTED, SHOW THE RESULTS ---
     else:
         st.success("✅ Form submitted successfully!")
         st.markdown("### 📝 AI Summary:")
-        st.info(st.session_state.summary) # Display summary from session state
+        st.info(st.session_state.summary)
 
         st.markdown("### 📄 Download & Share Report")
         with open(st.session_state.pdf_path, "rb") as f:
             st.download_button("⬇️ Download PDF Report", f, file_name="patient_report.pdf")
 
-        # Send email if one was provided
         if st.session_state.clinic_email:
             send_email(
                 st.session_state.clinic_email, 
@@ -110,14 +125,11 @@ def form_section():
             st.success(f"📧 Email sent to {st.session_state.clinic_email}!")
 
         st.markdown("### 🔗 Shareable QR Code")
-        # Assuming generate_qr returns a path to a saved image
-        qr_path = generate_qr("https://your-form-link.com") # Replace with your actual link
+        qr_path = generate_qr("https://your-form-link.com")
         st.image(qr_path, width=150)
 
         st.markdown("---")
-        # This button resets the state for the next patient
         if st.button("➡️ Start New Form for Next Patient"):
-            # Reset all relevant session state variables
             st.session_state.submitted = False
             st.session_state.summary = ""
             st.session_state.pdf_path = ""

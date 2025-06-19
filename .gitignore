@@ -1,4 +1,11 @@
 # .gitignore
+
+# Generated Output Files
+*.pdf
+*.png
+*.csv
+
+# Python Caching & Environment
 .env
 .streamlit/
 venv/
