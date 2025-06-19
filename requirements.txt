@@ -1,0 +1,10 @@
+streamlit
+transformers
+streamlit
+transformers
+sentence-transformers
+scikit-learn
+fpdf
+qrcode
+pillow
+python-dotenv
